@@ -14,6 +14,8 @@ type Server struct {
 	Router *gin.Engine
 }
 
+var errList = make(map[string]string)
+
 func (server *Server) Initialize() {
 	fmt.Println("initialize server")
 
