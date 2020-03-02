@@ -1,26 +1,30 @@
 package models
 
 import (
+	"context"
 	"errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"html"
+	"log"
 	"strings"
 	"time"
 )
 
+const CollectionName = "TodoList"
+
 type TodoList struct {
-	ID          uint64    `gorm:"primary_key;auto_increment" json:"id"`
-	User        User      `json:"user"`
-	UserId      uint32    `gorm:"not null" json:"user_id"`
-	Title       string    `gorm:"text;not null" json:"title"`
-	Description string    `gorm:"text;not null" json:"description"`
-	CreatedAt   time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Title       string             `json:"title" bson:"title, omitempty"`
+	Description string             `json:"description" bson:"description, omitempty"`
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at, omitempty"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at, omitempty"`
 }
 
 func (tl *TodoList) Prepare() {
 	tl.Title = html.EscapeString(strings.TrimSpace(tl.Title))
 	tl.Description = html.EscapeString(strings.TrimSpace(tl.Description))
-	tl.User = User{}
 	tl.CreatedAt = time.Now()
 	tl.UpdatedAt = time.Now()
 }
@@ -37,34 +41,43 @@ func (tl *TodoList) Validate() map[string]string {
 		err = errors.New("required description")
 		errorMessages["Required_description"] = err.Error()
 	}
-	if tl.UserId < 1 {
-		err = errors.New("required user")
-		errorMessages["Required_user"] = err.Error()
-	}
 
 	return errorMessages
 }
 
-func (tl *TodoList) CreateTodoList() (*TodoList, error) {
+func (tl *TodoList) CreateTodoList(context context.Context, database *mongo.Database) (*TodoList, error) {
+	collection := database.Collection(CollectionName)
+	res, err := collection.InsertOne(context, &tl)
+	if err != nil {
+		log.Fatal("insert one failed")
+		return &TodoList{}, err
+	}
+	// Type assertions: https://tour.golang.org/methods/15
+	tl.ID = res.InsertedID.(primitive.ObjectID)
 	return tl, nil
 }
 
-func (tl *TodoList) FindAllTodoLists() (*[]TodoList, error) {
-	// TODO use database!
-	todoLists := []TodoList{
-		{
-			ID: 1,
-			User: User{
-				ID:         11,
-				Username:   "Selim",
-				Email:      "selim@gmail.com",
-				Password:   "123",
-				AvatarPath: "1212231",
-			},
-			UserId:      1,
-			Title:       "Todo Item 1",
-			Description: "Do Something",
-		},
+func (tl *TodoList) FindAllTodoLists(context context.Context, database *mongo.Database) (*[]TodoList, error) {
+	var lists []TodoList
+	collection := database.Collection(CollectionName)
+	cur, err := collection.Find(context, bson.D{})
+	if err != nil {
+		log.Fatal(err)
 	}
-	return &todoLists, nil
+
+	for cur.Next(context) {
+		var list TodoList
+		err := cur.Decode(&list)
+		if err != nil {
+			log.Fatal(err)
+		}
+		lists = append(lists, list)
+	}
+	if err := cur.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	_ = cur.Close(context)
+
+	return &lists, nil
 }

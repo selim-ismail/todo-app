@@ -10,13 +10,6 @@ import (
 )
 
 func (server *Server) CreateTodoList(c *gin.Context) {
-	// unmarshall the body
-	// get token
-	// check user auth
-	// preapre todolist
-	// validate
-	// save
-
 	errList = map[string]string{}
 
 	body, err := ioutil.ReadAll(c.Request.Body)
@@ -52,7 +45,7 @@ func (server *Server) CreateTodoList(c *gin.Context) {
 	//
 	//// check if the user exist:
 	//user := models.User{}
-	//err = server.DB.Debug().Model(models.User{}).Where("id = ?", uid).Take(&user).Error
+	//err = server.Client.Debug().Model(models.User{}).Where("id = ?", uid).Take(&user).Error
 	//if err != nil {
 	//	errList["Unauthorized"] = "Unauthorized"
 	//	c.JSON(http.StatusUnauthorized, gin.H{
@@ -64,8 +57,6 @@ func (server *Server) CreateTodoList(c *gin.Context) {
 	//
 	//post.AuthorID = uid //the authenticated user is the one creating the post
 
-	todoList.UserId = 1 // FIXME
-
 	todoList.Prepare()
 	errorMessages := todoList.Validate()
 	if len(errorMessages) > 0 {
@@ -76,7 +67,7 @@ func (server *Server) CreateTodoList(c *gin.Context) {
 		return
 	}
 
-	todoListCreated, err := todoList.CreateTodoList()
+	todoListCreated, err := todoList.CreateTodoList(server.Context, server.Database)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -94,7 +85,7 @@ func (server *Server) GetAllTodoLists(c *gin.Context) {
 
 	todoList := models.TodoList{}
 
-	todoLists, err := todoList.FindAllTodoLists()
+	todoLists, err := todoList.FindAllTodoLists(server.Context, server.Database)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status": http.StatusNotFound,
